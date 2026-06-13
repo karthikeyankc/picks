@@ -1,18 +1,16 @@
 // ─── Picks Bookmarklet — unminified source ───────────────────────────────────
-// Minify this with https://minify-js.com and wrap in: javascript:(function(){...})();
-// Then paste as a bookmark URL.
+// Minify and wrap in: javascript:(function(){MINIFIED})();
+// Paste the result as a bookmark URL — token stays in your browser only, never in git.
 //
-// CONFIGURATION — set these once before minifying:
-const GITHUB_TOKEN = 'ghp_YOUR_TOKEN_HERE';   // fine-grained PAT: contents:write on picks repo
+// CONFIGURATION — fill in before minifying:
+const GITHUB_TOKEN = 'ghp_YOUR_TOKEN_HERE';   // fine-grained PAT: contents:write on picks repo only
 const GITHUB_OWNER = 'karthikeyankc';
 const GITHUB_REPO  = 'picks';
 const THEMES = ['design','philosophy','consciousness','writing','tech','science','life'];
 
 (function () {
-  // ── Don't open twice ──
   if (document.getElementById('__picks-overlay')) return;
 
-  // ── Read og tags ──
   function og(prop) {
     const el = document.querySelector(`meta[property="og:${prop}"], meta[name="${prop}"]`);
     return el ? el.getAttribute('content') || '' : '';
@@ -22,15 +20,12 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
   const pageDesc  = og('description') || '';
   const pageImage = og('image') || '';
 
-  // ── Slug from title ──
   function slugify(str) {
     return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
   }
 
-  // ── Date ──
   const today = new Date().toISOString().slice(0, 10);
 
-  // ── Styles ──
   const style = document.createElement('style');
   style.textContent = `
     #__picks-overlay{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
@@ -48,10 +43,10 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
     #__picks-btn-save:disabled{background:#999;cursor:not-allowed}
     #__picks-btn-cancel{padding:9px 16px;background:#f3f4f6;color:#555;border:none;border-radius:8px;font-size:13px;cursor:pointer}
     #__picks-status{font-size:12px;color:#555;text-align:center;min-height:16px}
+    #__picks-archive{font-size:11px;color:#aaa;word-break:break-all}
   `;
   document.head.appendChild(style);
 
-  // ── Markup ──
   const overlay = document.createElement('div');
   overlay.id = '__picks-overlay';
   overlay.innerHTML = `
@@ -82,9 +77,10 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
         </div>
       </div>
       <div>
-        <label>Note <span style="font-weight:400;color:#aaa">(optional — your voice)</span></label>
+        <label>Note <span style="font-weight:400;color:#aaa">(optional)</span></label>
         <textarea id="__p-note" style="min-height:42px" placeholder="Why this stuck."></textarea>
       </div>
+      <div id="__picks-archive">Checking Wayback Machine…</div>
       <div class="__picks-actions">
         <button id="__picks-btn-cancel">Cancel</button>
         <button id="__picks-btn-save">Save pick</button>
@@ -94,7 +90,26 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
   `;
   document.body.appendChild(overlay);
 
-  // ── Wire up ──
+  // ── Fetch closest Wayback snapshot ──
+  let archiveUrl = '';
+  fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(pageUrl)}`)
+    .then(r => r.json())
+    .then(data => {
+      const snap = data.archived_snapshots && data.archived_snapshots.closest;
+      if (snap && snap.available) {
+        archiveUrl = snap.url;
+        document.getElementById('__picks-archive').textContent = `Archive: ${archiveUrl}`;
+      } else {
+        // No snapshot — trigger one silently, store the save URL
+        archiveUrl = `https://web.archive.org/save/${pageUrl}`;
+        fetch(archiveUrl).catch(() => {});
+        document.getElementById('__picks-archive').textContent = `No snapshot found — archiving now.`;
+      }
+    })
+    .catch(() => {
+      document.getElementById('__picks-archive').textContent = 'Could not reach Wayback Machine.';
+    });
+
   document.getElementById('__picks-btn-cancel').onclick = () => overlay.remove();
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
@@ -111,9 +126,10 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
     if (!title || !url) { status.textContent = 'Title and URL are required.'; return; }
 
     const id   = `${today}-${slugify(title)}`;
-    const pick = { id, url, title, description: desc, theme, tags, date: today, note, image: pageImage };
+    const pick = { id, url, title, description: desc, theme, tags, date: today, note, image: pageImage, archive_url: archiveUrl };
     if (!pick.note) delete pick.note;
     if (!pick.image) delete pick.image;
+    if (!pick.archive_url) delete pick.archive_url;
 
     const filePath = `picks/${id}.json`;
     const content  = btoa(unescape(encodeURIComponent(JSON.stringify(pick, null, 2))));
@@ -122,7 +138,6 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
     status.textContent = 'Saving…';
 
     try {
-      // Check if file exists (to get SHA for update)
       let sha;
       const check = await fetch(
         `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`,
@@ -143,9 +158,9 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
       );
 
       if (res.ok) {
-        status.textContent = '✓ Saved! GitHub Action will rebuild index.json shortly.';
+        status.textContent = '✓ Saved.';
         btn.textContent = 'Saved ✓';
-        setTimeout(() => overlay.remove(), 1800);
+        setTimeout(() => overlay.remove(), 1600);
       } else {
         const err = await res.json();
         status.textContent = `Error: ${err.message}`;

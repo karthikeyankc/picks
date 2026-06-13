@@ -2,8 +2,6 @@
 
 Links worth finding — curated by [@karthikeyankc](https://karthikeyankc.com).
 
-Saved via bookmarklet → auto-committed here → live on [karthikeyankc.com/library/picks](https://karthikeyankc.com/library/picks) without a site rebuild.
-
 ## Structure
 
 - `picks/*.json` — one file per pick (source of truth, never edit index.json directly)
@@ -21,7 +19,8 @@ Saved via bookmarklet → auto-committed here → live on [karthikeyankc.com/lib
   "tags": ["tag-one", "tag-two"],
   "date": "YYYY-MM-DD",
   "note": "Optional — why this stuck.",
-  "image": "https://…/og.jpg"
+  "image": "https://…/og.jpg",
+  "archive_url": "https://web.archive.org/web/…"
 }
 ```
 
