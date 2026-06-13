@@ -6,7 +6,7 @@
 const GITHUB_TOKEN = 'ghp_YOUR_TOKEN_HERE';   // fine-grained PAT: contents:write on picks repo only
 const GITHUB_OWNER = 'karthikeyankc';
 const GITHUB_REPO  = 'picks';
-const THEMES = ['design','philosophy','consciousness','writing','tech','science','life'];
+const CATEGORIES = ['design','philosophy','consciousness','writing','tech','science','life'];
 
 (function () {
   if (document.getElementById('__picks-overlay')) return;
@@ -67,8 +67,8 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
       <div class="__picks-row">
         <div>
           <label>Theme</label>
-          <select id="__p-theme">
-            ${THEMES.map(t => `<option value="${t}">${t}</option>`).join('')}
+          <select id="__p-category">
+            ${CATEGORIES.map(t => `<option value="${t}">${t}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -119,14 +119,14 @@ const THEMES = ['design','philosophy','consciousness','writing','tech','science'
     const title  = document.getElementById('__p-title').value.trim();
     const url    = document.getElementById('__p-url').value.trim();
     const desc   = document.getElementById('__p-desc').value.trim();
-    const theme  = document.getElementById('__p-theme').value;
+    const category  = document.getElementById('__p-category').value;
     const tags   = document.getElementById('__p-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
     const note   = document.getElementById('__p-note').value.trim();
 
     if (!title || !url) { status.textContent = 'Title and URL are required.'; return; }
 
     const id   = `${today}-${slugify(title)}`;
-    const pick = { id, url, title, description: desc, theme, tags, date: today, note, image: pageImage, archive_url: archiveUrl };
+    const pick = { id, url, title, description: desc, category, tags, date: today, note, image: pageImage, archive_url: archiveUrl };
     if (!pick.note) delete pick.note;
     if (!pick.image) delete pick.image;
     if (!pick.archive_url) delete pick.archive_url;

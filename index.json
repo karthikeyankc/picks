@@ -4,7 +4,7 @@
     "url": "https://example.com/article",
     "title": "An example pick",
     "description": "A short description from og:description or written by hand.",
-    "theme": "design",
+    "category": "design",
     "tags": [
       "typography",
       "tools"

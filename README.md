@@ -15,7 +15,7 @@ Links worth finding — curated by [@karthikeyankc](https://karthikeyankc.com).
   "url": "https://...",
   "title": "Page title",
   "description": "og:description or your own one-liner",
-  "theme": "design",
+  "category": "design",
   "tags": ["tag-one", "tag-two"],
   "date": "YYYY-MM-DD",
   "note": "Optional — why this stuck.",
