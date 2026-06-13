@@ -1,0 +1,11 @@
+{
+  "id": "2026-06-13-example",
+  "url": "https://example.com/article",
+  "title": "An example pick",
+  "description": "A short description from og:description or written by hand.",
+  "theme": "design",
+  "tags": ["typography", "tools"],
+  "date": "2026-06-13",
+  "note": "Optional — why this is worth reading, in your own voice.",
+  "image": "https://example.com/og.jpg"
+}
