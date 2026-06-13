@@ -7,6 +7,7 @@ const GITHUB_TOKEN = 'ghp_YOUR_TOKEN_HERE';   // fine-grained PAT: contents:writ
 const GITHUB_OWNER = 'karthikeyankc';
 const GITHUB_REPO  = 'picks';
 const CATEGORIES = ['design','philosophy','consciousness','writing','tech','science','life'];
+const INDEX_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/index.json`;
 
 (function () {
   if (document.getElementById('__picks-overlay')) return;
@@ -44,6 +45,7 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
     #__picks-btn-cancel{padding:9px 16px;background:#f3f4f6;color:#555;border:none;border-radius:8px;font-size:13px;cursor:pointer}
     #__picks-status{font-size:12px;color:#555;text-align:center;min-height:16px}
     #__picks-archive{font-size:11px;color:#aaa;word-break:break-all}
+    #__picks-edit-badge{display:inline-block;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:5px}
   `;
   document.head.appendChild(style);
 
@@ -51,7 +53,7 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
   overlay.id = '__picks-overlay';
   overlay.innerHTML = `
     <div id="__picks-box">
-      <h2>+ Pick</h2>
+      <h2>+ Pick <span id="__picks-edit-badge" style="display:none">editing</span></h2>
       <div>
         <label>Title</label>
         <input id="__p-title" value="${pageTitle.replace(/"/g,'&quot;')}" />
@@ -66,7 +68,7 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
       </div>
       <div class="__picks-row">
         <div>
-          <label>Theme</label>
+          <label>Category</label>
           <select id="__p-category">
             ${CATEGORIES.map(t => `<option value="${t}">${t}</option>`).join('')}
           </select>
@@ -90,6 +92,30 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
   `;
   document.body.appendChild(overlay);
 
+  // ── Check index.json for existing pick with this URL ──
+  let existingId = null;
+  fetch(INDEX_URL + '?t=' + Date.now())
+    .then(r => r.ok ? r.json() : [])
+    .then(picks => {
+      const existing = picks.find(p => p.url === pageUrl);
+      if (existing) {
+        existingId = existing.id;
+        // Pre-fill with existing data
+        document.getElementById('__p-title').value       = existing.title || '';
+        document.getElementById('__p-desc').value        = existing.description || '';
+        document.getElementById('__p-note').value        = existing.note || '';
+        document.getElementById('__p-tags').value        = (existing.tags || []).join(', ');
+        document.getElementById('__picks-btn-save').textContent = 'Update pick';
+        document.getElementById('__picks-edit-badge').style.display = 'inline-block';
+        if (existing.category) {
+          const sel = document.getElementById('__p-category');
+          const opt = [...sel.options].find(o => o.value === existing.category);
+          if (opt) sel.value = existing.category;
+        }
+      }
+    })
+    .catch(() => {});
+
   // ── Fetch closest Wayback snapshot ──
   let archiveUrl = '';
   fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(pageUrl)}`)
@@ -100,10 +126,9 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
         archiveUrl = snap.url;
         document.getElementById('__picks-archive').textContent = `Archive: ${archiveUrl}`;
       } else {
-        // No snapshot — trigger one silently, store the save URL
         archiveUrl = `https://web.archive.org/save/${pageUrl}`;
         fetch(archiveUrl).catch(() => {});
-        document.getElementById('__picks-archive').textContent = `No snapshot found — archiving now.`;
+        document.getElementById('__picks-archive').textContent = 'No snapshot found — archiving now.';
       }
     })
     .catch(() => {
@@ -119,14 +144,17 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
     const title  = document.getElementById('__p-title').value.trim();
     const url    = document.getElementById('__p-url').value.trim();
     const desc   = document.getElementById('__p-desc').value.trim();
-    const category  = document.getElementById('__p-category').value;
+    const category = document.getElementById('__p-category').value;
     const tags   = document.getElementById('__p-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
     const note   = document.getElementById('__p-note').value.trim();
 
     if (!title || !url) { status.textContent = 'Title and URL are required.'; return; }
 
-    const id   = `${today}-${slugify(title)}`;
-    const pick = { id, url, title, description: desc, category, tags, date: today, note, image: pageImage, archive_url: archiveUrl };
+    // Preserve original id + date when editing, generate new when creating
+    const id   = existingId || `${today}-${slugify(title)}`;
+    const date = existingId ? id.slice(0, 10) : today;
+
+    const pick = { id, url, title, description: desc, category, tags, date, note, image: pageImage, archive_url: archiveUrl };
     if (!pick.note) delete pick.note;
     if (!pick.image) delete pick.image;
     if (!pick.archive_url) delete pick.archive_url;
@@ -135,7 +163,7 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
     const content  = btoa(unescape(encodeURIComponent(JSON.stringify(pick, null, 2))));
 
     btn.disabled = true;
-    status.textContent = 'Saving…';
+    status.textContent = existingId ? 'Updating…' : 'Saving…';
 
     try {
       let sha;
@@ -145,7 +173,7 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
       );
       if (check.ok) { const j = await check.json(); sha = j.sha; }
 
-      const body = { message: `pick: ${title}`, content };
+      const body = { message: existingId ? `edit: ${title}` : `pick: ${title}`, content };
       if (sha) body.sha = sha;
 
       const res = await fetch(
@@ -158,8 +186,8 @@ const CATEGORIES = ['design','philosophy','consciousness','writing','tech','scie
       );
 
       if (res.ok) {
-        status.textContent = '✓ Saved.';
-        btn.textContent = 'Saved ✓';
+        status.textContent = existingId ? '✓ Updated.' : '✓ Saved.';
+        btn.textContent = existingId ? 'Updated ✓' : 'Saved ✓';
         setTimeout(() => overlay.remove(), 1600);
       } else {
         const err = await res.json();
