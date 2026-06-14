@@ -6,8 +6,8 @@
 const GITHUB_TOKEN = 'ghp_YOUR_TOKEN_HERE';   // fine-grained PAT: contents:write on picks repo only
 const GITHUB_OWNER = 'karthikeyankc';
 const GITHUB_REPO  = 'picks';
-const CATEGORIES = ['design','philosophy','consciousness','writing','tech','science','life'];
-const INDEX_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/index.json`;
+const CONFIG_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/config.json`;
+const INDEX_URL  = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/index.json`;
 
 (function () {
   if (document.getElementById('__picks-overlay')) return;
@@ -69,9 +69,7 @@ const INDEX_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_RE
       <div class="__picks-row">
         <div>
           <label>Category</label>
-          <select id="__p-category">
-            ${CATEGORIES.map(t => `<option value="${t}">${t}</option>`).join('')}
-          </select>
+          <select id="__p-category"><option value="">Loading…</option></select>
         </div>
         <div>
           <label>Tags (comma separated)</label>
@@ -91,6 +89,19 @@ const INDEX_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_RE
     </div>
   `;
   document.body.appendChild(overlay);
+
+  // ── Fetch categories from config.json ──
+  fetch(CONFIG_URL + '?t=' + Date.now())
+    .then(r => r.ok ? r.json() : { categories: ['art','tech','science','philosophy','writing','life'] })
+    .then(cfg => {
+      const sel = document.getElementById('__p-category');
+      if (!sel) return;
+      sel.innerHTML = (cfg.categories || []).map(c => `<option value="${c}">${c}</option>`).join('');
+    })
+    .catch(() => {
+      const sel = document.getElementById('__p-category');
+      if (sel) sel.innerHTML = ['art','tech','science','philosophy','writing','life'].map(c => `<option value="${c}">${c}</option>`).join('');
+    });
 
   // ── Check index.json for existing pick with this URL ──
   let existingId = null;

@@ -1,0 +1,437 @@
+{
+  "name": "Picks \u2014 Save to GitHub",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Save a Pick",
+        "formDescription": "Add a link to your picks. Title and description auto-fill from the URL if left blank.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "URL",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "https://..."
+            },
+            {
+              "fieldLabel": "Title",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "Leave blank to auto-fill"
+            },
+            {
+              "fieldLabel": "Description",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "Leave blank to auto-fill"
+            },
+            {
+              "fieldLabel": "Category",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "art"
+                  },
+                  {
+                    "option": "tech"
+                  },
+                  {
+                    "option": "science"
+                  },
+                  {
+                    "option": "philosophy"
+                  },
+                  {
+                    "option": "writing"
+                  },
+                  {
+                    "option": "life"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Tags",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "comma separated, e.g. typography, tools"
+            },
+            {
+              "fieldLabel": "Note",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "Why this stuck."
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "responseText": "\u2713 Pick saved! GitHub Action will update your picks shortly."
+            }
+          }
+        }
+      },
+      "id": "form-trigger",
+      "name": "Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "picks-save"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json['URL'] }}",
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "scrape-url",
+      "name": "Scrape URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const formData = $('Form').first().json;\nconst html = $input.first().json?.data || '';\n\nfunction ogTag(name) {\n  const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=[\"'](?:og:)?${name}[\"'][^>]+content=[\"']([^\"']*)[\"']`, 'i'))\n         || html.match(new RegExp(`<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+(?:property|name)=[\"'](?:og:)?${name}[\"']`, 'i'));\n  return m ? m[1].trim() : '';\n}\n\nfunction titleTag() {\n  const m = html.match(/<title[^>]*>([^<]*)<\\/title>/i);\n  return m ? m[1].trim() : '';\n}\n\nconst url = formData['URL'] || '';\nlet host = '';\ntry { host = new URL(url).hostname.replace(/^www\\./, ''); } catch {}\n\nconst isYoutube = host === 'youtube.com' || host === 'youtu.be';\n\nconst title = formData['Title'] || ogTag('title') || titleTag() || host;\nconst description = formData['Description'] || ogTag('description') || '';\nconst image = ogTag('image') || '';\nconst category = formData['Category'] || 'tech';\nconst tags = (formData['Tags'] || '').split(',').map(t => t.trim()).filter(Boolean);\nconst note = formData['Note'] || '';\n\nconst today = new Date().toISOString().slice(0, 10);\nconst slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);\nconst id = `${today}-${slug}`;\n\nreturn [{ json: { url, host, isYoutube, title, description, image, category, tags, note, today, id } }];"
+      },
+      "id": "parse-og",
+      "name": "Parse + Merge",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isYoutube }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-youtube",
+      "name": "YouTube?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://archive.org/wayback/available?url={{ encodeURIComponent($json.url) }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "wayback-check",
+      "name": "Wayback Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        420
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Parse + Merge').first().json;\nconst wb = $input.first().json;\n\nconst snap = wb?.archived_snapshots?.closest;\nlet archiveUrl = '';\n\nif (snap && snap.available) {\n  archiveUrl = snap.url;\n} else {\n  // trigger a save (fire and forget \u2014 we don't await)\n  archiveUrl = `https://web.archive.org/save/${prev.url}`;\n  // n8n will proceed; Wayback save happens asynchronously\n}\n\nreturn [{ json: { ...prev, archiveUrl } }];"
+      },
+      "id": "wayback-result",
+      "name": "Wayback Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Parse + Merge').first().json;\nreturn [{ json: { ...prev, archiveUrl: '' } }];"
+      },
+      "id": "skip-wayback",
+      "name": "Skip Wayback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "output": "both"
+      },
+      "id": "merge",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst pick = {\n  id: d.id,\n  url: d.url,\n  title: d.title,\n  description: d.description,\n  category: d.category,\n  tags: d.tags,\n  date: d.today,\n};\nif (d.note) pick.note = d.note;\nif (d.image) pick.image = d.image;\nif (d.archiveUrl) pick.archive_url = d.archiveUrl;\n\nconst filePath = `picks/${d.id}.json`;\nconst content = btoa(unescape(encodeURIComponent(JSON.stringify(pick, null, 2))));\n\nreturn [{ json: { ...d, pick, filePath, content } }];"
+      },
+      "id": "build-pick",
+      "name": "Build Pick",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/karthikeyankc/picks/contents/{{ $json.filePath }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "github-get",
+      "name": "GitHub GET (check SHA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        300
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub PAT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Build Pick').first().json;\nconst ghResponse = $input.first().json;\n\nconst sha = ghResponse?.sha || null;\nconst isEdit = !!sha;\n\nconst body = {\n  message: isEdit ? `edit: ${prev.pick.title}` : `pick: ${prev.pick.title}`,\n  content: prev.content,\n};\nif (sha) body.sha = sha;\n\nreturn [{ json: { ...prev, sha, isEdit, githubBody: body } }];"
+      },
+      "id": "build-payload",
+      "name": "Build Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/karthikeyankc/picks/contents/{{ $json.filePath }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json.githubBody) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "github-put",
+      "name": "GitHub PUT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2440,
+        300
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "github-cred",
+          "name": "GitHub PAT"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Form": {
+      "main": [
+        [
+          {
+            "node": "Scrape URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape URL": {
+      "main": [
+        [
+          {
+            "node": "Parse + Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse + Merge": {
+      "main": [
+        [
+          {
+            "node": "YouTube?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube?": {
+      "main": [
+        [
+          {
+            "node": "Skip Wayback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wayback Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Wayback": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wayback Check": {
+      "main": [
+        [
+          {
+            "node": "Wayback Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wayback Result": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Build Pick",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Pick": {
+      "main": [
+        [
+          {
+            "node": "GitHub GET (check SHA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub GET (check SHA)": {
+      "main": [
+        [
+          {
+            "node": "Build Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Payload": {
+      "main": [
+        [
+          {
+            "node": "GitHub PUT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub PUT": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": []
+}
