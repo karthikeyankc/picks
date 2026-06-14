@@ -119,7 +119,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const formData = $('Form').first().json;\nconst html = $input.first().json?.data || '';\n\nfunction ogTag(name) {\n  const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=[\"'](?:og:)?${name}[\"'][^>]+content=[\"']([^\"']*)[\"']`, 'i'))\n         || html.match(new RegExp(`<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+(?:property|name)=[\"'](?:og:)?${name}[\"']`, 'i'));\n  return m ? m[1].trim() : '';\n}\n\nfunction titleTag() {\n  const m = html.match(/<title[^>]*>([^<]*)<\\/title>/i);\n  return m ? m[1].trim() : '';\n}\n\nconst url = formData['URL'] || '';\nlet host = '';\ntry { host = new URL(url).hostname.replace(/^www\\./, ''); } catch {}\n\nconst isYoutube = host === 'youtube.com' || host === 'youtu.be';\n\nconst title = formData['Title'] || ogTag('title') || titleTag() || host;\nconst description = formData['Description'] || ogTag('description') || '';\nconst image = ogTag('image') || '';\nconst category = formData['Category'] || 'tech';\nconst tags = (formData['Tags'] || '').split(',').map(t => t.trim()).filter(Boolean);\nconst note = formData['Note'] || '';\n\nconst today = new Date().toISOString().slice(0, 10);\nconst slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);\nconst id = `${today}-${slug}`;\n\nreturn [{ json: { url, host, isYoutube, title, description, image, category, tags, note, today, id } }];"
+        "jsCode": "const formData = $('Form').first().json;\nconst html = $input.first().json?.data || '';\n\nfunction ogTag(name) {\n  const m = html.match(new RegExp('<meta[^>]+(?:property|name)=[\"\\'](?:og:)?' + name + '[\"\\'][^>]+content=[\"\\']([^\"\\']*)[\"\\']', 'i'))\n         || html.match(new RegExp('<meta[^>]+content=[\"\\']([^\"\\']*)[\"\\'][^>]+(?:property|name)=[\"\\'](?:og:)?' + name + '[\"\\']', 'i'));\n  return m ? m[1].trim() : '';\n}\n\nfunction titleTag() {\n  const m = html.match(/<title[^>]*>([^<]*)<\\/title>/i);\n  return m ? m[1].trim() : '';\n}\n\nconst url = formData['URL'] || formData['url'] || '';\n\n// regex-based host extraction (avoids URL constructor sandbox issues)\nconst hostMatch = url.match(/^https?:\\/\\/([^\\/]+)/);\nconst host = hostMatch ? hostMatch[1].replace(/^www\\./, '') : '';\n\nconst isYoutube = !!(host === 'youtube.com' || host === 'youtu.be' || host.endsWith('.youtube.com'));\n\nconst title = formData['Title'] || ogTag('title') || titleTag() || host;\nconst description = formData['Description'] || ogTag('description') || '';\nconst image = ogTag('image') || '';\nconst category = formData['Category'] || 'other';\nconst tags = (formData['Tags'] || '').split(',').map(t => t.trim()).filter(Boolean);\nconst note = formData['Note'] || '';\n\nconst today = new Date().toISOString().slice(0, 10);\nconst slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);\nconst id = today + '-' + slug;\n\nreturn [{ json: { url, host, isYoutube, title, description, image, category, tags, note, today, id } }];"
       },
       "id": "parse-og",
       "name": "Parse + Merge",
@@ -136,15 +136,15 @@
           "options": {
             "caseSensitive": false,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.isYoutube }}",
-              "rightValue": true,
+              "leftValue": "={{ String($json.isYoutube) }}",
+              "rightValue": "true",
               "operator": {
-                "type": "boolean",
-                "operation": "equal"
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
@@ -205,20 +205,6 @@
     },
     {
       "parameters": {
-        "mode": "chooseBranch",
-        "output": "both"
-      },
-      "id": "merge",
-      "name": "Merge",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        1560,
-        300
-      ]
-    },
-    {
-      "parameters": {
         "jsCode": "const d = $input.first().json;\n\nconst pick = {\n  id: d.id,\n  url: d.url,\n  title: d.title,\n  description: d.description,\n  category: d.category,\n  tags: d.tags,\n  date: d.today,\n};\nif (d.note) pick.note = d.note;\nif (d.image) pick.image = d.image;\nif (d.archiveUrl) pick.archive_url = d.archiveUrl;\n\nconst filePath = `picks/${d.id}.json`;\nconst content = btoa(unescape(encodeURIComponent(JSON.stringify(pick, null, 2))));\n\nreturn [{ json: { ...d, pick, filePath, content } }];"
       },
       "id": "build-pick",
@@ -275,8 +261,8 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "sendBody": true,
-        "contentType": "json",
-        "body": "={{ JSON.stringify($json.githubBody) }}",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.githubBody) }}",
         "options": {
           "timeout": 15000
         }
@@ -353,7 +339,7 @@
       "main": [
         [
           {
-            "node": "Merge",
+            "node": "Build Pick",
             "type": "main",
             "index": 0
           }
@@ -372,17 +358,6 @@
       ]
     },
     "Wayback Result": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge": {
       "main": [
         [
           {
