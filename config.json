@@ -1,4 +1,22 @@
 {
-  "categories": ["art", "tech", "science", "philosophy", "writing", "life", "other"],
-  "tags": []
+  "categories": [
+    "art",
+    "tech",
+    "science",
+    "philosophy",
+    "writing",
+    "life",
+    "other"
+  ],
+  "tags": [
+    "agent",
+    "ai",
+    "creativity",
+    "funny",
+    "humans",
+    "music production",
+    "runaway",
+    "sound design",
+    "universe"
+  ]
 }
