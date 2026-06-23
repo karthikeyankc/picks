@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Generate index.json
+      - name: Generate index.json and update config.json
         run: |
           node << 'EOF'
           const fs = require('fs');
@@ -29,16 +29,22 @@ jobs:
             : [];
           fs.writeFileSync('index.json', JSON.stringify(files, null, 2));
           console.log('Built index.json with', files.length, 'picks');
+
+          const allTags = [...new Set(files.flatMap(p => p.tags || []))].sort();
+          const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+          config.tags = allTags;
+          fs.writeFileSync('config.json', JSON.stringify(config, null, 2));
+          console.log('Updated config.json with', allTags.length, 'tags:', allTags.join(', '));
           EOF
 
-      - name: Commit and push index.json
+      - name: Commit and push
         run: |
           git config user.name "picks-bot"
           git config user.email "picks-bot@users.noreply.github.com"
-          git add index.json
+          git add index.json config.json
           if git diff --staged --quiet; then
-            echo "No changes to index.json"
+            echo "No changes"
           else
-            git commit -m "chore: rebuild index.json [skip ci]"
+            git commit -m "chore: rebuild index [skip ci]"
             git push
           fi

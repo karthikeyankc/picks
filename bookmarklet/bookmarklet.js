@@ -46,6 +46,9 @@ const INDEX_URL  = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_R
     #__picks-status{font-size:12px;color:#555;text-align:center;min-height:16px}
     #__picks-archive{font-size:11px;color:#aaa;word-break:break-all}
     #__picks-edit-badge{display:inline-block;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:5px}
+    .__picks-tag-chip{display:inline-block;padding:2px 9px;border:1px solid #e0e0e0;border-radius:5px;font-size:11px;background:#f5f5f5;color:#555;cursor:pointer;user-select:none;font-family:inherit}
+    .__picks-tag-chip.active{background:#111;color:#fff;border-color:#111}
+    .__picks-tag-chip:hover:not(.active){background:#eee}
   `;
   document.head.appendChild(style);
 
@@ -72,8 +75,9 @@ const INDEX_URL  = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_R
           <select id="__p-category"><option value="">Loading…</option></select>
         </div>
         <div>
-          <label>Tags (comma separated)</label>
-          <input id="__p-tags" placeholder="e.g. typography, tools" />
+          <label>Tags <span style="font-weight:400;color:#aaa">(comma separated)</span></label>
+          <input id="__p-tags" placeholder="type or pick below" autocomplete="off" />
+          <div id="__p-tags-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
         </div>
       </div>
       <div>
@@ -90,13 +94,39 @@ const INDEX_URL  = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_R
   `;
   document.body.appendChild(overlay);
 
-  // ── Fetch categories from config.json ──
+  function syncChips() {
+    const current = document.getElementById('__p-tags').value.split(',').map(t => t.trim()).filter(Boolean);
+    document.querySelectorAll('.__picks-tag-chip').forEach(chip => {
+      chip.classList.toggle('active', current.includes(chip.dataset.tag));
+    });
+  }
+
+  document.getElementById('__p-tags').addEventListener('input', syncChips);
+  document.getElementById('__p-tags-suggest').addEventListener('click', e => {
+    const chip = e.target.closest('.__picks-tag-chip');
+    if (!chip) return;
+    const tag = chip.dataset.tag;
+    const input = document.getElementById('__p-tags');
+    const current = input.value.split(',').map(t => t.trim()).filter(Boolean);
+    const idx = current.indexOf(tag);
+    if (idx > -1) current.splice(idx, 1); else current.push(tag);
+    input.value = current.join(', ');
+    syncChips();
+  });
+
+  // ── Fetch categories + tags from config.json ──
   fetch(CONFIG_URL + '?t=' + Date.now())
     .then(r => r.ok ? r.json() : { categories: ['art','tech','science','philosophy','writing','life'] })
     .then(cfg => {
       const sel = document.getElementById('__p-category');
-      if (!sel) return;
-      sel.innerHTML = (cfg.categories || []).map(c => `<option value="${c}">${c}</option>`).join('');
+      if (sel) sel.innerHTML = (cfg.categories || []).map(c => `<option value="${c}">${c}</option>`).join('');
+      const suggestDiv = document.getElementById('__p-tags-suggest');
+      if (suggestDiv && cfg.tags && cfg.tags.length > 0) {
+        suggestDiv.innerHTML = cfg.tags.map(t =>
+          `<button type="button" class="__picks-tag-chip" data-tag="${t}">${t}</button>`
+        ).join('');
+        syncChips();
+      }
     })
     .catch(() => {
       const sel = document.getElementById('__p-category');
@@ -116,6 +146,7 @@ const INDEX_URL  = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_R
         document.getElementById('__p-desc').value        = existing.description || '';
         document.getElementById('__p-note').value        = existing.note || '';
         document.getElementById('__p-tags').value        = (existing.tags || []).join(', ');
+        syncChips();
         document.getElementById('__picks-btn-save').textContent = 'Update pick';
         document.getElementById('__picks-edit-badge').style.display = 'inline-block';
         if (existing.category) {
