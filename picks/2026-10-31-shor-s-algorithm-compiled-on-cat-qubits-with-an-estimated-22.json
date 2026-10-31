@@ -1,0 +1,14 @@
+{
+  "id": "2026-10-31-shor-s-algorithm-compiled-on-cat-qubits-with-an-estimated-22",
+  "url": "https://alice-bob.com/blog/our-estimate-for-factoring-rsa-2048-with-cat-qubits-pushing-the-frontier-between-size-and-speed/",
+  "title": "Shor's algorithm compiled on cat qubits with an estimated 22593 qubits to break RSA-2048",
+  "description": "A runtime of 3.14 days (roughly 75.36 hours), according to research published in October 2026 by Alice & Bob.",
+  "category": "tech",
+  "tags": [
+    "cryptography"
+  ],
+  "date": "2026-10-31",
+  "note": "Today I learned about cat qubits!",
+  "image": "https://alice-bob.com/wp-content/uploads/2026/10/chip_detail.jpg",
+  "archive_url": "http://web.archive.org/web/20261029223803/https://alice-bob.com/blog/our-estimate-for-factoring-rsa-2048-with-cat-qubits-pushing-the-frontier-between-size-and-speed/"
+}
